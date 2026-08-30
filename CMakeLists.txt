@@ -21,8 +21,12 @@ qt_add_qml_module(appflatulence
     URI flatulence
     QML_FILES
         Main.qml
-        SOURCES Broadcaster.h Broadcaster.cpp
-        SOURCES Listener.h Listener.cpp
+        SOURCES
+        SOURCES
+        SOURCES TransferReceiver.h TransferReceiver.cpp
+        SOURCES TransferSender.h TransferSender.cpp
+        SOURCES NetworkManager.h NetworkManager.cpp
+        SOURCES NetworkManagerTest.h NetworkManagerTest.cpp
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.

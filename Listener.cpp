@@ -2,26 +2,40 @@
 
 #include <QNetworkDatagram>
 #include <QUdpSocket>
-
+#include <QDebug>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 Listener::Listener(quint16 port , QObject *parent)
     : QObject{parent}
 {
     socket = new QUdpSocket(this);
-    socket->bind(QHostAddress::AnyIPv4, port, QUdpSocket::ShareAddress);
+    bool ok = socket->bind(
+        QHostAddress::AnyIPv4,
+        45678,
+        QUdpSocket::ShareAddress | QUdpSocket::ReuseAddressHint
+        );
+
+    qDebug() << "Bind result:" << ok;
+    qDebug() << "Error:" << socket->errorString();
+    qDebug() << "Local address:" << socket->localAddress();
+    qDebug() << "Local port:" << socket->localPort();
     connect(socket, &QUdpSocket::readyRead, this, &Listener::onReadyRead);
 
 }
 
 void Listener::onReadyRead()
 {
-    while(socket->hasPendingDatagrams()) {
+    while (socket->hasPendingDatagrams()) {
         QNetworkDatagram datagram = socket->receiveDatagram();
-        qDebug() << "Nhận từ" << datagram.senderAddress().toString()
-                 << ":" << datagram.data();
+        QJsonObject obj = QJsonDocument::fromJson(datagram.data()).object();
 
-        // Gửi ACK ngược lại cho A
-        QByteArray ack = "ACK_RECEIVED";
-        socket->writeDatagram(ack, datagram.senderAddress(), datagram.senderPort());
+        if (obj["type"].toString() == "file_offer") {
+            emit fileOffered(
+                datagram.senderAddress().toString(),
+                obj["filename"].toString(),
+                obj["size"].toVariant().toLongLong()
+                );
+        }
     }
 }

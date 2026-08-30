@@ -1,7 +1,8 @@
 #include "Broadcaster.h"
 #include <QUdpSocket>
 #include <QNetworkDatagram>
-
+#include <QJsonDocument>
+#include <QJsonObject>
 
 Broadcaster::Broadcaster(QObject *parent)
     : QObject{parent}
@@ -20,7 +21,7 @@ Broadcaster::Broadcaster(QObject *parent)
                  << socket->localAddress()
                  << socket->localPort();
     }
-    // Bên A cũng cần 1 socket lắng nghe phản hồi (dùng chung socket gửi cũng được)
+
     connect(socket, &QUdpSocket::readyRead, this, [this]() {
         while (socket->hasPendingDatagrams()) {
             QNetworkDatagram dg = socket->receiveDatagram();
@@ -42,4 +43,24 @@ void Broadcaster::sendSignal(const QString &messages, quint16 port)
     } else {
         qDebug() << "Đã gửi" << sent << "bytes ra khỏi máy (chưa chắc bên kia nhận)"  ;
     }
+}
+
+void Broadcaster::announceFile(const QString &fileName, qint64 fileSize)
+{
+    QJsonObject obj;
+    obj["type"] = "file_offer";
+    obj["filename"] = fileName;
+    obj["size"] = fileSize;
+
+    QByteArray data = QJsonDocument(obj).toJson(QJsonDocument::Compact);
+    socket->writeDatagram(data, QHostAddress::Broadcast, 45678);
+}
+
+void Broadcaster::sendPortReply(const QString &ip, quint16 port)
+{
+    QJsonObject obj;
+    obj["type"] = "port_reply";
+    obj["port"] = port;
+    QByteArray data = QJsonDocument(obj).toJson(QJsonDocument::Compact);
+    socket->writeDatagram(data, QHostAddress(ip), 45678);
 }
