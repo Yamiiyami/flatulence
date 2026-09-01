@@ -3,6 +3,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkInterface>
+#include <QSysInfo>
+#include <QDir>
 
 NetworkManagerTest::NetworkManagerTest(QObject *parent)
     : QObject{parent}
@@ -21,11 +23,10 @@ void NetworkManagerTest::discoverPeers()
 
     QJsonObject obj;
     obj["type"] = "DISCOVER_REQUEST";
-    obj["appName"] = "appNe";
+    obj["appName"] = "App ne";
     QJsonDocument jsDoc(obj);
     QByteArray data = jsDoc.toJson(QJsonDocument::Compact);
 
-    // QByteArray data = QJsonDocument(obj).toJson(QJsonDocument::Compact);
     quint16 port = 45454;
     qint64 result = socket->writeDatagram(data.data(), QHostAddress::Broadcast, port);
 
@@ -37,6 +38,32 @@ void NetworkManagerTest::discoverPeers()
     // socket->deleteLater();
 
 }
+
+void NetworkManagerTest::announceFile(const QString &targetIp, const QString &fileName, const qint64 fileSize)
+{
+    QJsonObject obj;
+    obj["type"] = "FILE_OFFER";
+    obj["device_name"] = QSysInfo::machineHostName();
+    obj["file_name"] = fileName;
+    obj["file_size"]= fileSize;
+    QJsonDocument doc(obj);
+    QByteArray byteArr = doc.toJson(QJsonDocument::Compact);
+    quint16 targetPort = 45454;
+    socket->writeDatagram(byteArr,QHostAddress(targetIp), targetPort);
+}
+
+void NetworkManagerTest::sendPortReply(const QString &ip, quint16 port)
+{
+    QJsonObject obj;
+    obj["type"] = "PORT_REPLY";
+    obj["port"] = port;
+    QJsonDocument doc(obj);
+    QByteArray byteArr = doc.toJson(QJsonDocument::Compact);
+    quint16 portRecive = 45454;
+    socket->writeDatagram(byteArr, QHostAddress(ip), portRecive);
+
+}
+
 QHostAddress NetworkManagerTest::getCurrentLocalIP() {
     const QList<QHostAddress> list = QNetworkInterface::allAddresses();
     for (const QHostAddress &address : list) {
@@ -71,17 +98,29 @@ void NetworkManagerTest::processPendingDatagrams()
             // if(senderIp == myLocalIp) continue;
             QJsonObject replyObj;
             replyObj["type"] = "DISCOVER_RESPONSE";
-            replyObj["deviceName"] = "May cua t ne";
+            replyObj["device_name"] = QSysInfo::machineHostName();
 
             QByteArray replyData = QJsonDocument(replyObj).toJson(QJsonDocument::Compact);
             socket->writeDatagram(replyData, senderIp, senderPort);
+
         }else if(type == "DISCOVER_RESPONSE") {
-            QString name = message["deviceName"].toString();
-             qDebug() << "Tìm thấy 1 người dùng online! IP:" << senderIp.toString() << " - Tên:" << name;
+            QString name = message["device_name"].toString();
+            qDebug() << "Tìm thấy 1 người dùng online! IP:" << senderIp.toString() << " - Tên:" << name;
+            emit peerDiscovered(name, senderIp.toString());
+
+        } else if(type == "FILE_OFFER") {
+            QString dName = message["device_name"].toString();
+            QString fName = message["file_name"].toString();
+            qint64 fSize = message["file_size"].toVariant().toLongLong();
+            emit fileOfferReceived(senderIp.toString(), dName, fName, fSize);
+
+        } else if(type == "PORT_REPLY") {
+            quint16 port = message["port"].toInt();
+            qDebug() << QDir::currentPath();
+            emit portReceived(senderIp.toString(), port);
 
         }
     }
-
 }
 
 

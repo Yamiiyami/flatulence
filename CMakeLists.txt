@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.16)
 project(flatulence VERSION 0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
+# set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(Qt6 REQUIRED COMPONENTS Quick)
 
 qt_standard_project_setup(REQUIRES 6.10)
@@ -23,10 +23,14 @@ qt_add_qml_module(appflatulence
         Main.qml
         SOURCES
         SOURCES
-        SOURCES TransferReceiver.h TransferReceiver.cpp
-        SOURCES TransferSender.h TransferSender.cpp
-        SOURCES NetworkManager.h NetworkManager.cpp
+        SOURCES
+        SOURCES
+        SOURCES
         SOURCES NetworkManagerTest.h NetworkManagerTest.cpp
+        SOURCES FileHelper.h FileHelper.cpp
+        SOURCES TranferSenderTest.h TranferSenderTest.cpp
+        SOURCES TransferReceiverTest.h TransferReceiverTest.cpp
+        SOURCES ConnectionHandler.h ConnectionHandler.cpp
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
