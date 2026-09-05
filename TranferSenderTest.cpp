@@ -4,7 +4,10 @@
 
 TranferSenderTest::TranferSenderTest(QObject *parent)
     : QObject{parent}
-{}
+{
+
+
+}
 
 void TranferSenderTest::sendFile(QString receiverIp, quint16 port, const QString &path)
 {

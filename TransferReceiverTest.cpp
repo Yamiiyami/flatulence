@@ -30,12 +30,11 @@ void TransferReceiverTest::onNewConnection()
     qDebug() << "Số lượng người đang kết nối:" << activeConnections.size();
 
     connect(handler, &ConnectionHandler::destroyed, this, [=]() {
-        // Khi đối tượng handler bị xóa (do deleteLater), tự động xóa nó khỏi danh sách
         activeConnections.removeOne(handler);
         qDebug() << "Một người đã rời đi. Còn lại:" << activeConnections.size();
     });
 
-    // Các kết nối progressChanged và fileReceived giữ nguyên...
+    connect(handler, &ConnectionHandler::fileReceiveStarted, this, &TransferReceiverTest::fileReceiveStarted);
     connect(handler, &ConnectionHandler::progressChanged, this, &TransferReceiverTest::progressChanged);
     connect(handler, &ConnectionHandler::fileReceived, this, &TransferReceiverTest::fileReceived);
 

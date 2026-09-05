@@ -1,6 +1,6 @@
 #include "ConnectionHandler.h"
 
-ConnectionHandler::ConnectionHandler(QTcpSocket *socket, QObject *parent)
+ConnectionHandler::ConnectionHandler(QTcpSocket *socket, QObject *parent) : QObject(parent)
 {
     this->socket = socket;
     socket->setParent(this);
@@ -16,7 +16,7 @@ void ConnectionHandler::onReadyRead()
     if(!headerParsed)
     {
         if(buffer.size() < 4) return;
-        qint32 headerlen;
+        quint32 headerlen;
         QDataStream ds(buffer.left(4));
         ds >> headerlen;
 
@@ -35,7 +35,7 @@ void ConnectionHandler::onReadyRead()
             qDebug() << "khong tao dc file";
             return ;
         }
-
+        emit fileReceiveStarted(name, expectSize);
         buffer.remove(0, 4 + (int)headerlen);
         headerParsed = true;
     }

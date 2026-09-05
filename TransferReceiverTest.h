@@ -18,6 +18,7 @@ public:
     Q_INVOKABLE quint16 startListening(quint16 port = 0);
 
 signals:
+    void fileReceiveStarted(const QString &fileName, qint64 size);
     void fileReceived(const QString &path);
     void progressChanged(qint64 received, qint64 total);
 private slots:

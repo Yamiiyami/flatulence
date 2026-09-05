@@ -11,6 +11,7 @@ class FileHelper : public QObject
 public:
     explicit FileHelper(QObject *parent = nullptr);
     Q_INVOKABLE QVariantMap getFileInfo(const QString &path);
+    QString formartFileSize(qint64 bytes);
 signals:
 
 

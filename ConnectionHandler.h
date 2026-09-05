@@ -23,6 +23,7 @@ public slots:
 signals:
     void progressChanged(qint64 received, qint64 total);
     void fileReceived(QString filePath);
+    void fileReceiveStarted(QString name, qint64 expectSize);
 
 private:
     QTcpSocket *socket = nullptr;

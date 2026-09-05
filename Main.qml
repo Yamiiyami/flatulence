@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
-import QtQuick.Controls.Basic
+import QtQuick.Controls
 import QtQuick.Dialogs
 import flatulence
 
@@ -12,423 +12,648 @@ ApplicationWindow {
     minimumHeight: 450
     visible: true
     title: qsTr("Flatulence")
-    color: "#1e1e2e"
 
-    property string selectedFileName: ""
-    property string selectedFilePath: ""
-    property int selectedFileSize: 0
-
-    Dialog {
-        id: myDialog
-        title: "Cài đặt Kết nối"
-        anchors.centerIn: parent
-        modal: true
-        standardButtons: Dialog.Ok | Dialog.Cancel
-        property string pendingIp: ""
-        property string pendingDeviceName: ""
-        property string pendingFileName: ""
-        property int pendingSize: 0
-        Column {
-            spacing: 10
-            width: parent.width
-
-            Text {
-                id: textDialog
-                text: "Nhập số Port để lắng nghe:"
-            }
-        }
-
-        onAccepted: {
-            var listeningPort = TransferReceiverTest.startListening();
-            if (listeningPort === 0) {
-                console.log("Không mở được port để lắng nghe");
-                return;
-            }
-            networkManager.sendPortReply(myDialog.pendingIp, listeningPort);
-        }
-        onRejected: {
-            console.log("Người dùng bấm Cancel hoặc đóng Dialog");
+    NetworkManagerTest {
+        id: networkManagerTest
+        onPeerDiscovered: (name, ip) => {
+            deviceModel.append({
+                "name": name,
+                "deviceType": "Phone",
+                "ip": ip,
+                "checked": false
+            });
         }
     }
-    SplitView {
-        anchors.fill: parent
-        orientation: Qt.Horizontal
 
-        Rectangle {
-            id: viewDevice
-            SplitView.preferredWidth: 260
-            SplitView.minimumWidth: 80
-            SplitView.maximumWidth: 400
-            SplitView.fillHeight: true
+    FileHelper {
+        id: fileHelper
+    }
 
-            Rectangle {
-                id: deviceHeader
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.right: parent.right
-                implicitHeight: 40
-                color: "gray"
-                Text {
-                    text: "Thiết bị"
-                }
-            }
-            TranferSenderTest {
-                id: transferSender
-            }
-            NetworkManagerTest {
-                id: networkManager
+    FileDialog {
+        id: fileDialog
+        title: "Chọn file muốn gửi"
+        fileMode: FileDialog.OpenFiles
 
-                onPeerDiscovered: function (name, ip) {
-                    for (var i = 0; i < deviceModel.count; i++) {
-                        if (deviceModel.get(i).ip === ip) {
-                            return;
-                        }
-                    }
+        nameFilters: ["All file (*)"]
+        onAccepted: {
+            for (var i = 0; i < selectedFiles.length; i++) {
+                var fileUrl = String(selectedFiles[i]);
 
-                    deviceModel.append({
-                        "name": name,
-                        "ip": ip
+                var result = fileHelper.getFileInfo(fileUrl);
+
+                if (result) {
+                    fileModel.append({
+                        "fileName": String(result.name),
+                        "size": String(result.size),
+                        "byte": String(result.size)
                     });
-                }
-
-                onFileOfferReceived: function (reciveIp, dname, fname, size) {
-                    myDialog.pendingIp = reciveIp;
-                    myDialog.pendingDeviceName = dname;
-                    myDialog.pendingFileName = fname;
-                    myDialog.pendingSize = size;
-                    textDialog.text = "Máy: " + dname + "/n" + "file: " + fname;
-                    myDialog.open();
-                }
-                onPortReceived: function (ip, port) {
-                    transferSender.sendFile(ip, port, window.selectedFilePath); // cần lưu full path lúc chọn file
-                }
-                Component.onCompleted: discoverPeers()
-            }
-
-            ListModel {
-                id: deviceModel
-            }
-
-            ListView {
-                anchors.top: deviceHeader.bottom
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.bottom: parent.bottom
-
-                model: deviceModel
-
-                delegate: Rectangle {
-                    width: ListView.view.width
-                    height: 50
-                    color: "orange"
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: {
-                            if (window.selectedFileName === "") {
-                                console.log("Chưa chọn file để gửi");
-                                return;
-                            }
-                            networkManager.announceFile(ip, window.selectedFileName, window.selectedFileSize);
-                        }
-                    }
-                    Image {
-                        id: imageDevice
-
-                        width: 40
-                        height: 40
-
-                        anchors.left: parent.left
-                        anchors.verticalCenter: parent.verticalCenter
-
-                        source: ""
-                    }
-
-                    Column {
-                        anchors.left: imageDevice.right
-                        anchors.leftMargin: 10
-                        anchors.verticalCenter: parent.verticalCenter
-
-                        Text {
-                            text: name
-                        }
-
-                        Text {
-                            text: ip
-                        }
-                    }
+                } else {
+                    console.log("Không lấy được thông tin file:", fileUrl);
                 }
             }
         }
+    }
 
-        Rectangle {
-            id: viewFile
+    ListModel {
+        id: deviceReceive
+    }
 
-            SplitView.fillWidth: true
-            SplitView.fillHeight: true
+    ListModel {
+        id: deviceModel
+    }
 
-            color: "#1f1f1f"
-            FileHelper {
-                id: fileHelper
-            }
-            FileDialog {
-                id: fileDialog
-                title: "Chọn file"
-                nameFilters: ["All files (*)"]
-                onAccepted: {
-                    console.log("Đã chọn:", selectedFile);
-                    var info = fileHelper.getFileInfo(selectedFile);
+    AppSplitView {
 
-                    window.selectedFileName = info.name;
-                    window.selectedFileSize = info.size;
-                    window.selectedFilePath = info.path;
-
-                    listFile.append({
-                        "name": info.name,
-                        "size": info.size
-                    });
-                }
-            }
+        leftView: Pane {
+            anchors.fill: parent
+            padding: 4
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: 4
-                spacing: 4
+                spacing: 8
 
-                RowLayout {
+                Rectangle {
+                    id: sidebar
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: sidebarTitle.implicitHeight
+                    Text {
+                        id: sidebarTitle
+                        text: "Thiết bị"
+                    }
+                }
+
+                SearchField {
+                    id: colorSearch
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 32
+                    leftPadding: 24
+                    rightPadding: 24
+
+                    Accessible.name: qsTr("Demo searchfield")
+                    background: Rectangle {
+                        radius: 8
+                        border.color: colorSearch.activeFocus ? "#3b82f6" : "#475569"
+                        border.width: 1
+                    }
+                }
+
+                ListView {
+                    id: devices
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.preferredHeight: 1
+                    spacing: 4
+                    clip: true
 
-                    spacing: 0
+                    model: deviceModel
 
-                    Rectangle {
-                        id: layoutFile
+                    delegate: ItemDelegate {
+                        id: itemDevice
+                        width: devices.width
+                        height: 40
 
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        Layout.preferredWidth: 1
-                        color: "#292929"
+                        leftPadding: 10
+                        rightPadding: 10
 
-                        DropArea {
-                            anchors.fill: parent
-
-                            onEntered: {
-                                layoutFile.color = "#333333";
-                            }
-
-                            onExited: {
-                                layoutFile.color = "#292929";
-                            }
-
-                            onDropped: function (drop) {
-                                layoutFile.color = "#292929";
-
-                                if (!drop.hasUrls)
-                                    return;
-                                for (var i = 0; i < drop.urls.length; i++) {
-                                    console.log("Dropped:", drop.urls[i]);
-                                }
-                            }
+                        background: Rectangle {
+                            color: itemDevice.hovered ? "#9de2ae" : "#96C98A"
+                            radius: 8
                         }
-
-                        ColumnLayout {
-                            anchors.centerIn: parent
-                            spacing: 4
-
-                            Text {
-                                Layout.alignment: Qt.AlignHCenter
-                                text: "Kéo & thả file vào đây"
-                                color: "white"
-
-                                font.pixelSize: 18
-                                font.bold: true
-                            }
-
-                            Text {
-                                Layout.alignment: Qt.AlignHCenter
-                                text: "hoặc"
-                                color: "#888888"
-                                font.pixelSize: 14
-                            }
-
-                            Button {
-                                Layout.alignment: Qt.AlignHCenter
-                                text: "Chọn file"
-                                onClicked: {
-                                    fileDialog.open();
-                                }
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-
-                        Layout.preferredWidth: 1
-                        color: "#292929"
-
-                        ColumnLayout {
+                        MouseArea {
                             anchors.fill: parent
-                            anchors.margins: 12
-                            spacing: 4
+                            onClicked: {
+                                var newChecked = !model.checked;
+                                deviceModel.setProperty(index, "checked", newChecked);
 
-                            Text {
-                                text: "Files"
-                                color: "white"
-                                font.pixelSize: 18
-                                font.bold: true
-                            }
-
-                            ListView {
-                                id: fileList
-
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-
-                                clip: true
-                                model: ListModel {
-                                    id: listFile
-                                }
-                                delegate: Rectangle {
-
-                                    width: fileList.width
-                                    height: 48
-                                    radius: 4
-                                    color: "#333333"
-
-                                    Text {
-                                        anchors.left: parent.left
-                                        anchors.leftMargin: 12
-
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: model.name
-                                        color: "white"
-                                        elide: Text.ElideRight
+                                if (newChecked) {
+                                    var isExisted = false;
+                                    for (var i = 0; i < deviceReceive.count; i++) {
+                                        if (deviceReceive.get(i).name === model.name) {
+                                            isExisted = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!isExisted) {
+                                        deviceReceive.append({
+                                            "name": model.name
+                                        });
+                                    }
+                                } else {
+                                    for (var j = 0; j < deviceReceive.count; j++) {
+                                        if (deviceReceive.get(j).name === model.name) {
+                                            deviceReceive.remove(j, 1);
+                                            break;
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                }
+                        contentItem: RowLayout {
+                            spacing: 10
+                            anchors.fill: parent
+                            Image {
+                                id: deviceIcon
+                                source: "assets/images/phone.png"
+                                Layout.preferredWidth: 24
+                                Layout.preferredHeight: 24
+                                sourceSize.width: 24
+                                sourceSize.height: 24
+                            }
 
-                ListModel {
-                    id: transferModel
-                }
+                            Text {
+                                text: model.name
+                                font.pointSize: 10
+                                font.weight: 500
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
+                                clip: true
+                            }
 
-                // helper: tìm index theo fileName, trả -1 nếu chưa có
-                function findTransferIndex(name) {
-                    for (var i = 0; i < transferModel.count; i++) {
-                        if (transferModel.get(i).fileName === name)
-                            return i;
-                    }
-                    return -1;
-                }
-
-                Connections {
-                    target: transferSender
-                    function onStarted(fileName, size) {
-                        transferModel.append({
-                            fileName: fileName,
-                            totalSize: size,
-                            sentBytes: 0,
-                            status: "Đang gửi",
-                            direction: "up"
-                        });
-                    }
-                    function onProgressChanged(sent, total) {
-                        // vì hiện tại chỉ có 1 transfer/lúc, lấy entry cuối cùng đang "Đang gửi"
-                        var idx = transferModel.count - 1;
-                        if (idx >= 0) {
-                            transferModel.setProperty(idx, "sentBytes", sent);
-                            transferModel.setProperty(idx, "totalSize", total);
+                            CheckBox {
+                                id: deviceCheck
+                                Layout.preferredWidth: 24
+                                Layout.fillHeight: true
+                                enabled: false
+                                checked: model.checked
+                            }
                         }
                     }
-                    function onFinished() {
-                        var idx = transferModel.count - 1;
-                        if (idx >= 0)
-                            transferModel.setProperty(idx, "status", "Hoàn tất");
-                    }
-                    function onErrorOccurred(err) {
-                        var idx = transferModel.count - 1;
-                        if (idx >= 0)
-                            transferModel.setProperty(idx, "status", "Lỗi: " + err);
+
+                    ScrollBar.vertical: ScrollBar {
+                        policy: ScrollBar.AsNeeded
                     }
                 }
 
-                // tương tự cho receiver:
-                // Connections { target: networkManager (hoặc handler) ... }
-
-                Rectangle {
+                Button {
+                    id: checkDevice
                     Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Layout.preferredHeight: 1
-                    color: "#292929"
-                    radius: 4
-                    border.width: 1
-                    border.color: "#444444"
+                    Layout.preferredHeight: 40
+                    font.weight: 500
+                    font.pixelSize: 14
+                    text: "Quét thiết bị"
+                    palette.buttonText: "#f1f1f1"
+                    background: Rectangle {
+                        color: checkDevice.pressed ? "#61ad5a" : checkDevice.hovered ? "#166534" : "#15803d"
+                        radius: 12
+                        border.color: "#1f1f1f"
+                    }
+                }
+            }
+        }
 
-                    ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: 8
-                        spacing: 6
+        rightView: ScrollContainer {
+            anchors.fill: parent
 
-                        Text {
-                            text: "Thông tin file / trạng thái"
-                            color: "#888888"
-                            font.pixelSize: 14
-                        }
+            Pane {
+                id: mainPane
+                rightPadding: 0
+                leftPadding: 0
 
-                        ListView {
-                            id: transferListView
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            clip: true
-                            model: transferModel
-                            visible: transferModel.count > 0
+                ColumnLayout {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    spacing: 8
 
-                            delegate: Rectangle {
-                                width: transferListView.width
-                                height: 56
-                                radius: 4
-                                color: "#333333"
+                    // HỘP XANH SỐ 1
+                    Rectangle {
+                        id: greenBox
+                        radius: 8
+                        color: "#96C98A"
+                        Layout.fillWidth: true
+
+                        Layout.preferredHeight: contentContainer.implicitHeight + 20
+
+                        ColumnLayout {
+                            id: contentContainer
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.topMargin: 10
+                            anchors.leftMargin: 6
+                            anchors.rightMargin: 10
+                            spacing: 15
+
+                            Rectangle {
+                                id: dropZoneBox
+                                bottomLeftRadius: 8
+                                topLeftRadius: 8
+                                color: "#96C98A"
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 200
+
+                                Canvas {
+                                    id: canvasBorder
+                                    anchors.fill: parent
+                                    anchors.margins: 2
+
+                                    onWidthChanged: requestPaint()
+                                    onHeightChanged: requestPaint()
+
+                                    onPaint: {
+                                        var ctx = getContext("2d");
+                                        ctx.reset();
+                                        ctx.strokeStyle = "#15803d";
+                                        ctx.lineWidth = 2;
+                                        ctx.setLineDash([6, 4]);
+
+                                        var x = ctx.lineWidth / 2;
+                                        var y = ctx.lineWidth / 2;
+                                        var w = width - ctx.lineWidth;
+                                        var h = height - ctx.lineWidth;
+                                        var r = 8;
+                                        ctx.beginPath();
+                                        ctx.moveTo(x + r, y);
+                                        ctx.lineTo(x + w - r, y);
+                                        ctx.arcTo(x + w, y, x + w, y + r, r);
+                                        ctx.lineTo(x + w, y + h - r);
+                                        ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+                                        ctx.lineTo(x + r, y + h);
+                                        ctx.arcTo(x, y + h, x, y + h - r, r);
+                                        ctx.lineTo(x, y + r);
+                                        ctx.arcTo(x, y, x + r, y, r);
+                                        ctx.closePath();
+
+                                        ctx.stroke();
+                                    }
+                                }
 
                                 ColumnLayout {
                                     anchors.fill: parent
-                                    anchors.margins: 8
-                                    spacing: 4
+                                    spacing: 10
 
-                                    RowLayout {
+                                    Item {
+                                        Layout.fillHeight: true
+                                    }
+                                    Image {
+                                        source: "assets/images/import.png"
+                                        Layout.preferredWidth: 42
+                                        Layout.preferredHeight: 42
+                                        sourceSize.width: 24
+                                        sourceSize.height: 24
+                                        Layout.alignment: Qt.AlignHCenter
+                                    }
+                                    Label {
+                                        text: "Kéo thả file vào đây hoặc"
+                                        font.bold: true
+                                        color: "#15803d"
                                         Layout.fillWidth: true
-                                        Text {
-                                            text: (direction === "up" ? "⬆ " : "⬇ ") + fileName
-                                            color: "white"
-                                            elide: Text.ElideRight
-                                            Layout.fillWidth: true
-                                        }
-                                        Text {
-                                            text: status
-                                            color: status.indexOf("Lỗi") === 0 ? "#e06c75" : "#888888"
-                                            font.pixelSize: 12
-                                        }
+                                        horizontalAlignment: Text.AlignHCenter
                                     }
 
-                                    ProgressBar {
-                                        Layout.fillWidth: true
-                                        from: 0
-                                        to: totalSize > 0 ? totalSize : 1
-                                        value: sentBytes
+                                    Button {
+                                        text: "thêm file từ máy này"
+                                        Layout.alignment: Qt.AlignHCenter
+                                        palette.buttonText: "#f1f1f1"
+                                        background: Rectangle {
+                                            color: parent.pressed ? "#96C98A" : parent.hovered ? "#166534" : "#15803d"
+                                            border.color: "#1f1f1f"
+                                            radius: 4
+                                        }
+                                        onClicked: {
+                                            fileDialog.open();
+                                        }
+                                    }
+                                    Item {
+                                        Layout.fillHeight: true
+                                    }
+                                }
+                                DropArea {
+                                    anchors.fill: parent
+                                    onDropped: drop => {
+                                        if (drop.hasUrls) {
+                                            for (var i = 0; i < drop.urls.length; i++) {
+                                                var fileUrl = String(drop.urls[i]);
+
+                                                var result = fileHelper.getFileInfo(fileUrl);
+
+                                                if (result) {
+                                                    fileModel.append({
+                                                        "fileName": String(result.name),
+                                                        "size": String(result.size),
+                                                        "byte": result.byte
+                                                    });
+                                                } else {
+                                                    console.log("Không lấy được thông tin file:", fileUrl);
+                                                }
+                                            }
+                                            drop.acceptProposedAction();
+                                        }
+                                    }
+                                }
+                            }
+
+                            ListView {
+                                id: listFile
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: listFile.contentHeight
+                                interactive: false
+                                spacing: 4
+                                clip: true
+
+                                model: ListModel {
+                                    id: fileModel
+                                }
+
+                                delegate: ItemDelegate {
+                                    width: listFile.width
+                                    height: 40
+                                    leftPadding: 10
+                                    rightPadding: 10
+
+                                    background: Rectangle {
+                                        color: "#bf7fbf"
+                                        border.color: "#1f1f1f"
+                                        radius: 8
+                                    }
+
+                                    contentItem: RowLayout {
+                                        ColumnLayout {
+                                            spacing: 0
+                                            Text {
+                                                text: model.fileName
+                                                color: "#fdfdfd"
+                                            }
+                                            Text {
+                                                text: model.size
+                                                color: "#fdfdfd"
+                                                font.pointSize: 8
+                                            }
+                                        }
+                                        Item {
+                                            Layout.fillWidth: true
+                                        }
+                                        Image {
+                                            source: "assets/images/Bin.png"
+                                            Layout.preferredWidth: 12
+                                            Layout.preferredHeight: 12
+                                            sourceSize.width: 24
+                                            sourceSize.height: 24
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                onClicked: {
+                                                    fileModel.remove(index, 1);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+
+                                Layout.preferredHeight: implicitHeight
+                                spacing: 6
+
+                                Label {
+                                    text: "Thiết bị nhận file (" + flowRepeater.count + " máy đã chọn):"
+                                    font.bold: true
+                                    font.pointSize: 10
+                                    color: "#15803d"
+                                    Layout.fillWidth: true
+                                    leftPadding: 6
+                                }
+                                Label {
+                                    text: "Chưa có thiết bị nào được chọn"
+                                    font.italic: true
+                                    font.pointSize: 9.5
+                                    color: "#6b7280"
+                                    Layout.fillWidth: true
+                                    leftPadding: 12
+                                    topPadding: 4
+                                    bottomPadding: 4
+                                    visible: flowRepeater.count === 0
+                                }
+
+                                Flow {
+                                    id: flow
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: flow.implicitHeight
+                                    spacing: 4
+
+                                    Repeater {
+                                        id: flowRepeater
+                                        model: deviceReceive
+
+                                        delegate: ItemDelegate {
+                                            id: itemRoot
+                                            height: 30
+                                            leftPadding: 8
+                                            rightPadding: 8
+
+                                            background: Rectangle {
+                                                color: "#bf7fbf"
+                                                border.color: "#1f1f1f"
+                                                radius: 15
+                                            }
+
+                                            contentItem: RowLayout {
+
+                                                spacing: 6
+                                                Text {
+                                                    text: model.name
+                                                    font.family: "Ubuntu Sans Mono"
+                                                    color: "white"
+                                                    font.pointSize: 9
+                                                }
+                                                Image {
+                                                    source: "assets/images/remove.png"
+                                                    Layout.preferredWidth: 14
+                                                    Layout.preferredHeight: 14
+                                                    sourceSize.width: 20
+                                                    sourceSize.height: 20
+
+                                                    MouseArea {
+                                                        anchors.fill: parent
+
+                                                        onClicked: {
+                                                            var deviceName = model.name;
+
+                                                            for (var i = 0; i < deviceModel.count; i++) {
+                                                                if (deviceModel.get(i).name === deviceName) {
+                                                                    deviceModel.setProperty(i, "checked", false);
+                                                                    break;
+                                                                }
+                                                            }
+                                                            deviceReceive.remove(index, 1);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Button {
+                                text: "Gửi Files"
+                                Layout.alignment: Qt.AlignRight
+                                palette.buttonText: "#f1f1f1"
+                                background: Rectangle {
+                                    color: parent.pressed ? "#96C98A" : parent.hovered ? "#166534" : "#15803d"
+                                    border.color: "#1f1f1f"
+                                    radius: 4
+                                }
+                                onClicked: {
+                                    if (deviceReceive.count === 0) {
+                                        console.log("Vui lòng chọn người nhận");
+                                        return;
+                                    }
+                                    var fileName = fileModel.get(0).fileName;
+                                    var fileSize = fileModel.get(0).byte;
+                                    networkManagerTest.announceFile(deviceReceive.get(0).ip, fileName, fileSize);
+                                }
+                            }
+                        }
+                    }
+
+                    // HỘP XANH SỐ 2
+                    Rectangle {
+                        radius: 8
+                        color: "#96C98A"
+                        Layout.fillWidth: true
+
+                        Layout.preferredHeight: containerRequest.implicitHeight
+                        ColumnLayout {
+                            id: containerRequest
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: "Yêu cầu gần đây"
+                                font.weight: 700
+                                color: "#15803d"
+                                leftPadding: 8
+                                topPadding: 8
+                            }
+                            Text {
+                                color: "#919191"
+                                Layout.fillWidth: true
+                                text: "Không có yêu cầu"
+                                font.italic: true
+                                verticalAlignment: Text.AlignVCenter
+                                horizontalAlignment: Text.AlignHCenter
+                                styleColor: "#555555"
+                                leftPadding: 8
+                                topPadding: 8
+                                enabled: itemRequest.cout === 0
+                            }
+                            ListView {
+                                id: listRequest
+                                Layout.fillWidth: true
+                                spacing: 4
+                                leftMargin: 10
+                                rightMargin: 10
+                                clip: true
+                                Layout.preferredHeight: listRequest.contentHeight + 20
+                                interactive: false
+                                model: ListModel {
+                                    id: itemRequest
+                                    // ListElement {
+                                    //     nameDevice: "Samsung pro max"
+                                    //     typeDevice: "Phone"
+                                    //     nameFile: "video360.mp4"
+                                    //     sizeFile: "200mb"
+                                    // }
+                                    // ListElement {
+                                    //     nameDevice: "Samsung pro max"
+                                    //     typeDevice: "Phone"
+                                    //     nameFile: "video360.mp4"
+                                    //     sizeFile: "200mb"
+                                    // }
+                                }
+
+                                delegate: ItemDelegate {
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    leftPadding: 8
+                                    rightPadding: 8
+
+                                    background: Rectangle {
+
+                                        color: "#bf7fbf"
+                                        radius: 18
+                                        border.color: "#1f1f1f"
+                                    }
+                                    contentItem: ColumnLayout {
+
+                                        spacing: 2
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            Layout.fillHeight: true
+                                            Image {
+                                                Layout.preferredHeight: 28
+                                                Layout.preferredWidth: 28
+                                                source: "assets/images/laptop.png"
+                                            }
+                                            ColumnLayout {
+                                                Layout.fillHeight: true
+                                                Layout.fillWidth: true
+                                                Layout.margins: 5
+                                                Text {
+                                                    text: model.nameDevice
+                                                    color: "#f1f1f1"
+                                                }
+                                                Text {
+                                                    color: "#f1f1f1"
+                                                    text: model.nameFile
+                                                }
+                                            }
+                                        }
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            Layout.preferredHeight: 40
+                                            Text {
+                                                text: model.sizeFile
+                                                color: "#f1f1f1"
+                                                Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
+                                                verticalAlignment: Text.AlignBottom
+                                            }
+
+                                            Item {
+                                                Layout.fillWidth: true
+                                            }
+
+                                            RowLayout {
+                                                Layout.fillHeight: true
+                                                // color: "orange"
+                                                Button {
+
+                                                    text: "accept"
+                                                    font.pixelSize: 14
+                                                    background: Rectangle {
+                                                        color: "transparent"
+                                                    }
+                                                    font.weight: 600
+                                                }
+                                                Button {
+                                                    text: "Decline"
+                                                    background: Rectangle {
+                                                        color: "transparent"
+                                                    }
+
+                                                    font.pixelSize: 14
+                                                    font.weight: 600
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
+                    }
+
+                    // HỘP XANH SỐ 3
+                    Rectangle {
+                        radius: 8
+                        color: "#96C98A"
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 200
 
                         Text {
-                            visible: transferModel.count === 0
-                            text: "Chưa có transfer nào"
-                            color: "#666666"
-                            font.pixelSize: 12
-                            Layout.alignment: Qt.AlignHCenter
+                            anchors.centerIn: parent
+                            text: "Hộp xanh số 3"
                         }
                     }
                 }

@@ -21,16 +21,21 @@ qt_add_qml_module(appflatulence
     URI flatulence
     QML_FILES
         Main.qml
-        SOURCES
-        SOURCES
-        SOURCES
-        SOURCES
-        SOURCES
         SOURCES NetworkManagerTest.h NetworkManagerTest.cpp
         SOURCES FileHelper.h FileHelper.cpp
         SOURCES TranferSenderTest.h TranferSenderTest.cpp
         SOURCES TransferReceiverTest.h TransferReceiverTest.cpp
         SOURCES ConnectionHandler.h ConnectionHandler.cpp
+        QML_FILES ScrollContainer.qml
+        QML_FILES AppSplitView.qml
+        RESOURCES
+        "assets/images/computer.png"
+        "assets/images/laptop.png"
+        "assets/images/phone.png"
+        "assets/images/Bin.png"
+        "assets/images/remove.png"
+          "assets/images/import.png"
+
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
