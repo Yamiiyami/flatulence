@@ -35,7 +35,6 @@ void NetworkManagerTest::discoverPeers()
     } else {
         qDebug() << "Dang quet cac may trong mang Lan";
     }
-    // socket->deleteLater();
 
 }
 

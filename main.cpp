@@ -7,8 +7,8 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
 
 
-    NetworkManagerTest *net = new NetworkManagerTest();
-    net->discoverPeers();
+    // NetworkManagerTest *net = new NetworkManagerTest();
+    // net->discoverPeers();
 
     QQmlApplicationEngine engine;
     QObject::connect(

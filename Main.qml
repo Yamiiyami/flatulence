@@ -23,6 +23,26 @@ ApplicationWindow {
                 "checked": false
             });
         }
+        onFileOfferReceived: (ip, dName, fName, fSize) => {
+            itemRequest.append({
+                "nameDevice": dName,
+                "typeDevice": "phone",
+                "nameFile": fName,
+                "sizeFile": fSize
+            });
+        }
+        onPortReceived: (ip, port) => {
+            console.log("cdcdc", itemRequest.get(0).nameFile);
+            tranferSenderTest.sendFile(ip, port, fileModel.get(0).path);
+        }
+    }
+
+    Component.onCompleted: {
+        networkManagerTest.discoverPeers();
+    }
+
+    TranferSenderTest {
+        id: tranferSenderTest
     }
 
     FileHelper {
@@ -43,6 +63,7 @@ ApplicationWindow {
 
                 if (result) {
                     fileModel.append({
+                        "path": String(result.path),
                         "fileName": String(result.name),
                         "size": String(result.size),
                         "byte": String(result.size)
@@ -328,6 +349,7 @@ ApplicationWindow {
 
                                                 if (result) {
                                                     fileModel.append({
+                                                        "path": String(result.path),
                                                         "fileName": String(result.name),
                                                         "size": String(result.size),
                                                         "byte": result.byte
@@ -537,7 +559,7 @@ ApplicationWindow {
                                 styleColor: "#555555"
                                 leftPadding: 8
                                 topPadding: 8
-                                enabled: itemRequest.cout === 0
+                                enabled: itemRequest.count === 0
                             }
                             ListView {
                                 id: listRequest
@@ -550,18 +572,6 @@ ApplicationWindow {
                                 interactive: false
                                 model: ListModel {
                                     id: itemRequest
-                                    // ListElement {
-                                    //     nameDevice: "Samsung pro max"
-                                    //     typeDevice: "Phone"
-                                    //     nameFile: "video360.mp4"
-                                    //     sizeFile: "200mb"
-                                    // }
-                                    // ListElement {
-                                    //     nameDevice: "Samsung pro max"
-                                    //     typeDevice: "Phone"
-                                    //     nameFile: "video360.mp4"
-                                    //     sizeFile: "200mb"
-                                    // }
                                 }
 
                                 delegate: ItemDelegate {
@@ -626,6 +636,10 @@ ApplicationWindow {
                                                         color: "transparent"
                                                     }
                                                     font.weight: 600
+                                                    onClicked: {
+                                                        var port = TransferReceiverTest.startListening();
+                                                        networkManagerTest.sendPortReply(deviceReceive.get(0).ip, port);
+                                                    }
                                                 }
                                                 Button {
                                                     text: "Decline"
