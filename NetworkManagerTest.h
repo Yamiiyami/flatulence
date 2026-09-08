@@ -5,6 +5,8 @@
 #include <QObject>
 #include <QHostAddress>
 #include <qqml.h>
+#include <QAbstractListModel>
+
 
 class NetworkManagerTest : public QObject
 {
@@ -15,6 +17,7 @@ public:
     Q_INVOKABLE void discoverPeers();
     Q_INVOKABLE void announceFile(const QString &targetIp, const QString &fileName, const qint64 fileSize);
     Q_INVOKABLE void sendPortReply(const QString &ip, quint16 port);
+    Q_INVOKABLE void notifyRecipientsWithFiles(QAbstractListModel *targetIps, QAbstractListModel *files);
 
 public slots:
     void processPendingDatagrams();

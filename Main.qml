@@ -16,25 +16,30 @@ ApplicationWindow {
     NetworkManagerTest {
         id: networkManagerTest
         onPeerDiscovered: (name, ip) => {
-            deviceModel.append({
-                "name": name,
-                "deviceType": "Phone",
-                "ip": ip,
-                "checked": false
-            });
-        }
+                              deviceModel.append({
+                                                     "name": name,
+                                                     "deviceType": "Phone",
+                                                     "ip": ip,
+                                                     "checked": false
+                                                 });
+                          }
         onFileOfferReceived: (ip, dName, fName, fSize) => {
-            itemRequest.append({
-                "nameDevice": dName,
-                "typeDevice": "phone",
-                "nameFile": fName,
-                "sizeFile": fSize
-            });
-        }
+                                 console.log  ("đã nhận duiwocjd file");
+                                 itemRequest.append({
+                                                        "nameDevice": dName,
+                                                        "typeDevice": "phone",
+                                                        "senderIp": ip,
+                                                        "files": [{
+                                                                "nameFile": fName,
+                                                                "sizeFile": fSize
+                                                            }]
+
+                                                    });
+                             }
         onPortReceived: (ip, port) => {
-            console.log("cdcdc", itemRequest.get(0).nameFile);
-            tranferSenderTest.sendFile(ip, port, fileModel.get(0).path);
-        }
+                            // tranferSenderTest.sendFile(ip, port, fileModel.get(0).path);
+                            tranferSenderTest.sendFiles(ip, port, fileModel);
+                        }
     }
 
     Component.onCompleted: {
@@ -63,16 +68,18 @@ ApplicationWindow {
 
                 if (result) {
                     fileModel.append({
-                        "path": String(result.path),
-                        "fileName": String(result.name),
-                        "size": String(result.size),
-                        "byte": String(result.size)
-                    });
+                                         "path": String(result.path),
+                                         "fileName": String(result.name),
+                                         "size": String(result.size),
+                                         "byte": String(result.byte)
+                                     });
                 } else {
                     console.log("Không lấy được thông tin file:", fileUrl);
                 }
             }
         }
+
+
     }
 
     ListModel {
@@ -81,6 +88,45 @@ ApplicationWindow {
 
     ListModel {
         id: deviceModel
+    }
+
+    ListModel {
+        id: fileModel
+    }
+
+    ListModel {
+        id: itemRequest
+        ListElement {
+            nameDevice: "Samsung"
+            typeDevice: "phone"
+            senderIp: "192.168.1.111"
+            files: [
+                ListElement {
+                    nameFile: "video.mp4"
+                    sizeFile: "123 MB"
+                },
+                ListElement {
+                    nameFile: "video-19-928162.mp4"
+                    sizeFile: "122 MB"
+                }
+                // ListElement {
+                //     nameFile: "video-19-928162.mp4"
+                //     sizeFile: "122 MB"
+                // }
+            ]
+
+        }
+        ListElement {
+            nameDevice: "Samsung"
+            typeDevice: "phone"
+            senderIp: "192.168.1.111"
+            files: [
+                ListElement {
+                    nameFile: "video.mp4"
+                    sizeFile: "123 MB"
+                }]
+
+        }
     }
 
     AppSplitView {
@@ -155,8 +201,9 @@ ApplicationWindow {
                                     }
                                     if (!isExisted) {
                                         deviceReceive.append({
-                                            "name": model.name
-                                        });
+                                                                 "name": model.name,
+                                                                 "ip" : model.ip
+                                                             });
                                     }
                                 } else {
                                     for (var j = 0; j < deviceReceive.count; j++) {
@@ -341,26 +388,26 @@ ApplicationWindow {
                                 DropArea {
                                     anchors.fill: parent
                                     onDropped: drop => {
-                                        if (drop.hasUrls) {
-                                            for (var i = 0; i < drop.urls.length; i++) {
-                                                var fileUrl = String(drop.urls[i]);
+                                                   if (drop.hasUrls) {
+                                                       for (var i = 0; i < drop.urls.length; i++) {
+                                                           var fileUrl = String(drop.urls[i]);
 
-                                                var result = fileHelper.getFileInfo(fileUrl);
+                                                           var result = fileHelper.getFileInfo(fileUrl);
 
-                                                if (result) {
-                                                    fileModel.append({
-                                                        "path": String(result.path),
-                                                        "fileName": String(result.name),
-                                                        "size": String(result.size),
-                                                        "byte": result.byte
-                                                    });
-                                                } else {
-                                                    console.log("Không lấy được thông tin file:", fileUrl);
-                                                }
-                                            }
-                                            drop.acceptProposedAction();
-                                        }
-                                    }
+                                                           if (result) {
+                                                               fileModel.append({
+                                                                                    "path": String(result.path),
+                                                                                    "fileName": String(result.name),
+                                                                                    "size": String(result.size),
+                                                                                    "byte": result.byte
+                                                                                });
+                                                           } else {
+                                                               console.log("Không lấy được thông tin file:", fileUrl);
+                                                           }
+                                                       }
+                                                       drop.acceptProposedAction();
+                                                   }
+                                               }
                                 }
                             }
 
@@ -372,9 +419,7 @@ ApplicationWindow {
                                 spacing: 4
                                 clip: true
 
-                                model: ListModel {
-                                    id: fileModel
-                                }
+                                model: fileModel
 
                                 delegate: ItemDelegate {
                                     width: listFile.width
@@ -520,6 +565,7 @@ ApplicationWindow {
                                         console.log("Vui lòng chọn người nhận");
                                         return;
                                     }
+                                    console.log("gửi file nè");
                                     var fileName = fileModel.get(0).fileName;
                                     var fileSize = fileModel.get(0).byte;
                                     networkManagerTest.announceFile(deviceReceive.get(0).ip, fileName, fileSize);
@@ -559,8 +605,9 @@ ApplicationWindow {
                                 styleColor: "#555555"
                                 leftPadding: 8
                                 topPadding: 8
-                                enabled: itemRequest.count === 0
+                                visible: itemRequest.count === 0
                             }
+
                             ListView {
                                 id: listRequest
                                 Layout.fillWidth: true
@@ -570,9 +617,7 @@ ApplicationWindow {
                                 clip: true
                                 Layout.preferredHeight: listRequest.contentHeight + 20
                                 interactive: false
-                                model: ListModel {
-                                    id: itemRequest
-                                }
+                                model:itemRequest
 
                                 delegate: ItemDelegate {
                                     anchors.left: parent.left
@@ -588,7 +633,7 @@ ApplicationWindow {
                                     }
                                     contentItem: ColumnLayout {
 
-                                        spacing: 2
+                                        spacing: 0
                                         RowLayout {
                                             Layout.fillWidth: true
                                             Layout.fillHeight: true
@@ -602,24 +647,44 @@ ApplicationWindow {
                                                 Layout.fillWidth: true
                                                 Layout.margins: 5
                                                 Text {
+                                                    font.pixelSize: 14
+                                                    font.weight: 600
                                                     text: model.nameDevice
                                                     color: "#f1f1f1"
                                                 }
-                                                Text {
-                                                    color: "#f1f1f1"
-                                                    text: model.nameFile
+
+                                                Row {
+                                                    Layout.fillWidth: true
+                                                    spacing: 6
+                                                    Repeater {
+                                                        model:  itemRequest.get(index).files
+                                                        delegate: Rectangle {
+                                                            width: contentRow.width + 16
+                                                            height: 30
+                                                            color: "#15803d"
+                                                            border.color: "#1f1f1f"
+                                                            radius: 16
+                                                            Row {
+                                                                id: contentRow
+                                                                spacing: 2
+                                                                anchors.centerIn: parent
+                                                                Text {
+                                                                    color: "#f1f1f1"
+                                                                    text: model.nameFile
+                                                                }
+                                                                Text {
+                                                                    color: "#f1f1f1"
+                                                                    text: model.sizeFile
+                                                                }
+                                                            }
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
                                         RowLayout {
                                             Layout.fillWidth: true
                                             Layout.preferredHeight: 40
-                                            Text {
-                                                text: model.sizeFile
-                                                color: "#f1f1f1"
-                                                Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
-                                                verticalAlignment: Text.AlignBottom
-                                            }
 
                                             Item {
                                                 Layout.fillWidth: true
@@ -627,7 +692,7 @@ ApplicationWindow {
 
                                             RowLayout {
                                                 Layout.fillHeight: true
-                                                // color: "orange"
+
                                                 Button {
 
                                                     text: "accept"
@@ -649,12 +714,17 @@ ApplicationWindow {
 
                                                     font.pixelSize: 14
                                                     font.weight: 600
+
+                                                    onClicked: {
+                                                        itemRequest.remove(index, 1);
+                                                    }
                                                 }
                                             }
                                         }
                                     }
                                 }
                             }
+
                         }
                     }
 

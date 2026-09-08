@@ -48,7 +48,15 @@ void NetworkManagerTest::announceFile(const QString &targetIp, const QString &fi
     QJsonDocument doc(obj);
     QByteArray byteArr = doc.toJson(QJsonDocument::Compact);
     quint16 targetPort = 45454;
-    socket->writeDatagram(byteArr,QHostAddress(targetIp), targetPort);
+    qDebug() << "targetIp" << targetIp;
+    qDebug() << "fileName" << fileName;
+    qDebug() << "fileSize" << fileSize;
+    qint64 result = socket->writeDatagram(byteArr,QHostAddress(targetIp), targetPort);
+    if(result == -1)  {
+        qDebug() << "gui khong thanh cong";
+    }else {
+         qDebug() << "gui thanh cong";
+    }
 }
 
 void NetworkManagerTest::sendPortReply(const QString &ip, quint16 port)
@@ -62,6 +70,22 @@ void NetworkManagerTest::sendPortReply(const QString &ip, quint16 port)
     socket->writeDatagram(byteArr, QHostAddress(ip), portRecive);
 
 }
+
+void NetworkManagerTest::notifyRecipientsWithFiles(QAbstractListModel *targetIps, QAbstractListModel *files)
+{
+
+    int row = targetIps->rowCount();
+    QHash<int, QByteArray> role =  targetIps->roleNames();
+    for(int i= 0; i < row; i++)
+    {
+        QModelIndex index = targetIps->index(i, 0);
+
+
+    }
+
+}
+
+
 
 QHostAddress NetworkManagerTest::getCurrentLocalIP() {
     const QList<QHostAddress> list = QNetworkInterface::allAddresses();

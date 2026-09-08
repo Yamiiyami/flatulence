@@ -1,6 +1,7 @@
 #include "TranferSenderTest.h"
 #include <QFile>
 #include <QFileInfo>
+#include <QAbstractListModel>
 
 TranferSenderTest::TranferSenderTest(QObject *parent)
     : QObject{parent}
@@ -71,5 +72,95 @@ void TranferSenderTest::sendFile(QString receiverIp, quint16 port, const QString
 
     socket->connectToHost(QHostAddress(receiverIp), port);
 }
+
+void TranferSenderTest::sendFiles(QString receiverIp, quint16 port, QAbstractListModel *paths)
+{
+    if(!paths) return;
+
+    int row = paths->rowCount();
+
+    QHash<int, QByteArray> roles = paths->roleNames();
+
+    for(int i = 0; i < row; i++)
+    {
+        QModelIndex index = paths->index(i, 0);
+        QString path = paths->data(index, roles.key("path")).toString();
+        qDebug() << "file: " << path;
+        QFile *file = new QFile();
+        file->setFileName(path);
+        if(!file->open(QIODevice::ReadOnly))
+        {
+            qDebug() << "Không mở được file";
+            emit errorOccurred("Không mở được file" + path);
+            return;
+        }
+
+        TransferJob *tranJob = new TransferJob();
+
+        tranJob->file = file;
+        tranJob->socket = new QTcpSocket(this);
+        tranJob->totalSize = file->size();
+
+        jobs.append(tranJob);
+
+        connect(tranJob->socket, &QTcpSocket::connected, this, [this, tranJob] () {
+            QJsonObject js;
+            QFileInfo fileInfo(tranJob->file->fileName());
+            js["file_name"] = fileInfo.fileName();
+            js["size"] = tranJob->file->size();
+            QJsonDocument dc(js);
+            QByteArray header = dc.toJson(QJsonDocument::Compact);
+            quint32 sizeHear = header.size();
+
+            QByteArray lenPrefix;
+            QDataStream stream(&lenPrefix, QIODevice::WriteOnly);
+            stream << sizeHear;
+
+            tranJob->socket->write(lenPrefix);
+            tranJob->socket->write(header);
+            tranJob->socket->write(tranJob->file->read(CHUNK_SIZE));
+        });
+
+        connect(tranJob->socket, &QTcpSocket::bytesWritten, this, [this, tranJob]() {
+            if(tranJob->socket->bytesToWrite() > 0) return;
+
+
+            if(tranJob->file->atEnd())
+            {
+                tranJob->file->close();
+                tranJob->socket->disconnectFromHost();
+
+                jobs.removeOne(tranJob);
+                tranJob->file->deleteLater();
+                tranJob->socket->deleteLater();
+                delete tranJob;
+                if (jobs.isEmpty()) {
+                    emit finished();
+                }
+                return;
+
+            }
+
+            tranJob->socket->write(tranJob->file->read(CHUNK_SIZE));
+
+        });
+        connect( tranJob->socket, &QTcpSocket::errorOccurred, this, [this, tranJob]() {
+            emit errorOccurred(tranJob->socket->errorString());
+        });
+
+        tranJob->socket->connectToHost(QHostAddress(receiverIp), port);
+
+    }
+
+
+}
+
+void TranferSenderTest::sendFilesToUsers(QAbstractListModel *receiversIp, quint16 port, QAbstractListModel *paths)
+{
+
+}
+
+
+
 
 
