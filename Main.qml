@@ -42,7 +42,19 @@ ApplicationWindow {
         }
         onPortReceived: (ip, port) => {
             // tranferSenderTest.sendFile(ip, port, fileModel.get(0).path);
+            console.log("[DEBUG] onPortReceived - ip:", ip, "port:", port);
             tranferSenderTest.sendFiles(ip, port, fileModel);
+        }
+        onOffersSent: (successCount, failCount) => {
+            if (successCount > 0) {
+                notifyBanner.text = "Đã gửi lời mời tới " + successCount + " thiết bị" + (failCount > 0 ? " (" + failCount + " thất bại)" : "");
+                notifyBanner.visible = true;
+                notifyBannerTimer.restart();
+            } else {
+                notifyBanner.text = "Gửi lời mời thất bại";
+                notifyBanner.visible = true;
+                notifyBannerTimer.restart();
+            }
         }
     }
 
@@ -52,8 +64,123 @@ ApplicationWindow {
 
     TranferSenderTest {
         id: tranferSenderTest
+
+        onStarted: (receiverIp, fileName, size) => {
+            console.log("[DEBUG] started:", receiverIp, fileName, size);
+            var idx = -1;
+            for (var i = 0; i < activeTransfers.count; i++) {
+                if (activeTransfers.get(i).ip === receiverIp) {
+                    idx = i;
+                    break;
+                }
+            }
+            if (idx === -1) {
+                activeTransfers.append({
+                    "ip": receiverIp,
+                    "fileName": fileName,
+                    "percent": 0,
+                    "status": "sending"
+                });
+            } else {
+                activeTransfers.setProperty(idx, "fileName", fileName);
+                activeTransfers.setProperty(idx, "percent", 0);
+            }
+        }
+
+        onProgressChanged: (receiverIp, fileName, sent, total) => {
+            console.log("[DEBUG] progress:", receiverIp, sent, "/", total);
+            var percent = total > 0 ? Math.round((sent / total) * 100) : 0;
+            for (var i = 0; i < activeTransfers.count; i++) {
+                if (activeTransfers.get(i).ip === receiverIp) {
+                    activeTransfers.setProperty(i, "fileName", fileName);
+                    activeTransfers.setProperty(i, "percent", percent);
+                    break;
+                }
+            }
+        }
+
+        onFinished: receiverIp => {
+            for (var i = 0; i < activeTransfers.count; i++) {
+                if (activeTransfers.get(i).ip === receiverIp) {
+                    activeTransfers.setProperty(i, "status", "done");
+                    activeTransfers.setProperty(i, "percent", 100);
+                    break;
+                }
+            }
+
+            // Xóa khỏi danh sách người nhận đã chọn
+            for (var j = 0; j < deviceReceive.count; j++) {
+                if (deviceReceive.get(j).ip === receiverIp) {
+                    deviceReceive.remove(j, 1);
+                    break;
+                }
+            }
+            // Bỏ tick trong deviceModel
+            for (var k = 0; k < deviceModel.count; k++) {
+                if (deviceModel.get(k).ip === receiverIp) {
+                    deviceModel.setProperty(k, "checked", false);
+                    break;
+                }
+            }
+
+            removeTransferTimer.targetIp = receiverIp;
+            removeTransferTimer.restart();
+        }
+
+        onErrorOccurred: (receiverIp, msg) => {
+            console.log("[DEBUG] finished:", receiverIp);
+            for (var i = 0; i < activeTransfers.count; i++) {
+                if (activeTransfers.get(i).ip === receiverIp) {
+                    activeTransfers.setProperty(i, "status", "failed");
+                    break;
+                }
+            }
+            console.log("Lỗi gửi tới", receiverIp, ":", msg);
+        }
     }
 
+    Timer {
+        id: removeTransferTimer
+        interval: 1500
+        property string targetIp: ""
+        onTriggered: {
+            for (var i = 0; i < activeTransfers.count; i++) {
+                if (activeTransfers.get(i).ip === targetIp) {
+                    activeTransfers.remove(i, 1);
+                    break;
+                }
+            }
+        }
+    }
+    Rectangle {
+        id: notifyBanner
+        property alias text: notifyBannerText.text
+        visible: false
+        color: "#15803d"
+        radius: 8
+        z: 100
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.topMargin: 12
+        width: notifyBannerText.implicitWidth + 24
+        height: notifyBannerText.implicitHeight + 16
+
+        Text {
+            id: notifyBannerText
+            anchors.centerIn: parent
+            color: "#f1f1f1"
+            font.pointSize: 10
+        }
+    }
+
+    Timer {
+        id: notifyBannerTimer
+        interval: 2500
+        onTriggered: notifyBanner.visible = false
+    }
+    ListModel {
+        id: activeTransfers
+    }
     FileHelper {
         id: fileHelper
     }
@@ -98,38 +225,6 @@ ApplicationWindow {
 
     ListModel {
         id: itemRequest
-        ListElement {
-            nameDevice: "Samsung"
-            typeDevice: "phone"
-            senderIp: "192.168.1.111"
-            files: [
-                ListElement {
-                    nameFile: "video.mp4"
-                    sizeFile: "123 MB"
-                },
-                ListElement {
-                    nameFile: "video-19-928162.mp4"
-                    sizeFile: "122 MB"
-                }
-                // ListElement {
-                //     nameFile: "video-19-928162.mp4"
-                //     sizeFile: "122 MB"
-                // }
-
-
-            ]
-        }
-        ListElement {
-            nameDevice: "Samsung"
-            typeDevice: "phone"
-            senderIp: "192.168.1.111"
-            files: [
-                ListElement {
-                    nameFile: "video.mp4"
-                    sizeFile: "123 MB"
-                }
-            ]
-        }
     }
 
     AppSplitView {
@@ -574,9 +669,7 @@ ApplicationWindow {
                                         return;
                                     }
 
-                                    for (var i = 0; i < deviceReceive.count; i++) {
-                                        networkManagerTest.notifyRecipientsWithFiles(deviceReceive, fileModel);
-                                    }
+                                    networkManagerTest.notifyRecipientsWithFiles(deviceReceive, fileModel);
                                 }
                             }
                         }
@@ -711,9 +804,8 @@ ApplicationWindow {
                                                     font.weight: 600
                                                     onClicked: {
                                                         var port = TransferReceiverTest.startListening();
-                                                        // Dùng đúng ip của REQUEST đang accept (model.ip),
-                                                        // không phải deviceReceive - hai model khác mục đích nhau
-                                                        networkManagerTest.sendPortReply(model.ip, port);
+                                                        networkManagerTest.sendPortReply(model.senderIp, port);
+                                                        // itemRequest.remove(index, 1); // xóa ngay sau khi accept
                                                     }
                                                 }
                                                 Button {
@@ -741,11 +833,65 @@ ApplicationWindow {
                         radius: 8
                         color: "#96C98A"
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 200
+                        Layout.preferredHeight: progressContainer.implicitHeight + 20
 
-                        Text {
-                            anchors.centerIn: parent
-                            text: "Hộp xanh số 3"
+                        ColumnLayout {
+                            id: progressContainer
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.margins: 10
+                            spacing: 8
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: "Tiến trình gửi file"
+                                font.weight: 700
+                                color: "#15803d"
+                            }
+
+                            Text {
+                                color: "#919191"
+                                Layout.fillWidth: true
+                                text: "Chưa có file nào đang gửi"
+                                font.family: "Ubuntu Sans Mono"
+                                font.italic: true
+                                horizontalAlignment: Text.AlignHCenter
+                                topPadding: 8
+                                bottomPadding: 8
+                                visible: activeTransfers.count === 0
+                            }
+
+                            Repeater {
+                                model: activeTransfers
+                                delegate: ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 2
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Text {
+                                            text: model.ip + " — " + model.fileName
+                                            font.pointSize: 9
+                                            color: "#15803d"
+                                            Layout.fillWidth: true
+                                            elide: Text.ElideRight
+                                        }
+                                        Text {
+                                            text: model.status === "done" ? "Hoàn tất" : model.status === "failed" ? "Lỗi" : model.percent + "%"
+                                            font.pointSize: 9
+                                            color: model.status === "failed" ? "#dc2626" : "#15803d"
+                                        }
+                                    }
+
+                                    ProgressBar {
+                                        Layout.fillWidth: true
+                                        from: 0
+                                        to: 100
+                                        value: model.percent
+                                    }
+                                }
+                            }
                         }
                     }
                 }

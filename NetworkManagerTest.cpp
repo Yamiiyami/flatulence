@@ -74,11 +74,13 @@ void NetworkManagerTest::notifyRecipientsWithFiles(QAbstractListModel *targetIps
 {
     if (!targetIps) {
         qDebug() << "Danh sach IP trong!";
+        emit offersSent(0, 0);
         return;
     }
 
     if(!files) {
         qDebug() << "vui long chon files truoc khi gui";
+        emit offersSent(0, 0);
         return;
     }
 
@@ -100,11 +102,12 @@ void NetworkManagerTest::notifyRecipientsWithFiles(QAbstractListModel *targetIps
         fileArr.append(objFile);
     }
 
-
     int ipRowCount = targetIps->rowCount();
-    QHash<int, QByteArray> role =  targetIps->roleNames();
+    QHash<int, QByteArray> role = targetIps->roleNames();
+    int successCount = 0;
+    int failCount = 0;
 
-    for(int i= 0; i < ipRowCount; i++)
+    for(int i = 0; i < ipRowCount; i++)
     {
         QJsonObject obj;
         QModelIndex index = targetIps->index(i, 0);
@@ -125,6 +128,7 @@ void NetworkManagerTest::notifyRecipientsWithFiles(QAbstractListModel *targetIps
 
         if (ipstr.isEmpty()) {
             qDebug() << "Dong" << i << "khong co truong 'ip' hop le!";
+            failCount++;
             continue;
         }
 
@@ -133,13 +137,14 @@ void NetworkManagerTest::notifyRecipientsWithFiles(QAbstractListModel *targetIps
 
         if(result == -1) {
             qDebug() << "ko gửi được tới ip: " + ipstr;
+            failCount++;
         } else {
             qDebug() << "gửi thành công tới ip: " + ipstr;
+            successCount++;
         }
-
-
     }
 
+    emit offersSent(successCount, failCount); // MỚI — báo lên QML
 }
 
 
@@ -169,12 +174,11 @@ void NetworkManagerTest::processPendingDatagrams()
         socket->readDatagram(datagram.data(), datagram.size(), &senderIp, &senderPort);
 
         QJsonObject message = QJsonDocument::fromJson(datagram.data()).object();
-        qDebug() << "Nhận được từ IP:" << senderIp.toString() << "Port:" << senderPort;
         QString type =  message["type"].toString();
 
         if(type == "DISCOVER_REQUEST")
         {
-            // if(senderIp == myLocalIp) continue;
+            if(senderIp == myLocalIp) continue;
             QJsonObject replyObj;
             replyObj["type"] = "DISCOVER_RESPONSE";
             replyObj["device_name"] = QSysInfo::machineHostName();
@@ -184,13 +188,10 @@ void NetworkManagerTest::processPendingDatagrams()
 
         }else if(type == "DISCOVER_RESPONSE") {
             QString name = message["device_name"].toString();
-            qDebug() << "Tìm thấy 1 người dùng online! IP:" << senderIp.toString() << " - Tên:" << name;
             emit peerDiscovered(name, senderIp.toString());
 
         } else if(type == "FILE_OFFER") {
             QString dName = message["device_name"].toString();
-            // QString fName = message["file_name"].toString();
-            // qint64 fSize = message["file_size"].toVariant().toLongLong();
             QJsonArray filesArray = message["files"].toArray();
             QVariantList variantFiles;
             for (const QJsonValue &v : filesArray) {
@@ -205,7 +206,6 @@ void NetworkManagerTest::processPendingDatagrams()
 
         } else if(type == "PORT_REPLY") {
             quint16 port = message["port"].toInt();
-            qDebug() << QDir::currentPath();
             emit portReceived(senderIp.toString(), port);
 
         }

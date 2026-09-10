@@ -10,12 +10,14 @@
 #include <QDataStream>
 #include <qqml.h>
 #include <QList>
+#include <QHash>
 #include <QAbstractListModel>
 
 struct TransferJob {
     QFile *file;
     QTcpSocket *socket;
     qint64 totalSize;
+    QString receiverIp;
 };
 
 class TranferSenderTest : public QObject
@@ -29,13 +31,15 @@ public:
     Q_INVOKABLE void sendFilesToUsers(QAbstractListModel *receiversIp, quint16 port, QAbstractListModel *paths);
 
 signals:
-    void finished();
-    void errorOccurred(const QString &msg);
-    void progressChanged(qint64 sent, qint64 total);
-    void started(const QString &fileName, qint64 size);
+    void started(const QString &receiverIp, const QString &fileName, qint64 size);
+    void progressChanged(const QString &receiverIp, const QString &fileName, qint64 sent, qint64 total);
+    void fileFinished(const QString &receiverIp, const QString &fileName);
+    void finished(const QString &receiverIp);
+    void errorOccurred(const QString &receiverIp, const QString &msg);
 
 private:
     QList<TransferJob*> jobs;
+    QHash<QString, int> pendingCountByIp;
     static const quint64 CHUNK_SIZE = 65536; // 64kb
 };
 

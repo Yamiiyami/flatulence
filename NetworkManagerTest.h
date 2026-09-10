@@ -24,9 +24,9 @@ public slots:
 
 signals:
     void peerDiscovered(const QString &name, const QString &ip);
-    // void fileOfferReceived(const QString &senderIp, QString DeviceName, QString fileName, qint64 fileSize);
-    void fileOfferReceived(const QString &senderIp, QString DeviceName, QVariantList files);
-    void portReceived(QString senderIp, quint16 port);
+    void fileOfferReceived(const QString &ip, const QString &deviceName, const QVariantList &files);
+    void portReceived(const QString &ip, quint16 port);
+    void offersSent(int successCount, int failCount);
 
 private:
     QUdpSocket *socket;
