@@ -5,6 +5,7 @@
 #include <QNetworkInterface>
 #include <QSysInfo>
 #include <QDir>
+#include <QJsonArray>
 
 NetworkManagerTest::NetworkManagerTest(QObject *parent)
     : QObject{parent}
@@ -48,9 +49,7 @@ void NetworkManagerTest::announceFile(const QString &targetIp, const QString &fi
     QJsonDocument doc(obj);
     QByteArray byteArr = doc.toJson(QJsonDocument::Compact);
     quint16 targetPort = 45454;
-    qDebug() << "targetIp" << targetIp;
-    qDebug() << "fileName" << fileName;
-    qDebug() << "fileSize" << fileSize;
+
     qint64 result = socket->writeDatagram(byteArr,QHostAddress(targetIp), targetPort);
     if(result == -1)  {
         qDebug() << "gui khong thanh cong";
@@ -73,12 +72,70 @@ void NetworkManagerTest::sendPortReply(const QString &ip, quint16 port)
 
 void NetworkManagerTest::notifyRecipientsWithFiles(QAbstractListModel *targetIps, QAbstractListModel *files)
 {
+    if (!targetIps) {
+        qDebug() << "Danh sach IP trong!";
+        return;
+    }
 
-    int row = targetIps->rowCount();
-    QHash<int, QByteArray> role =  targetIps->roleNames();
-    for(int i= 0; i < row; i++)
+    if(!files) {
+        qDebug() << "vui long chon files truoc khi gui";
+        return;
+    }
+
+    int fileRowCount = files->rowCount();
+    QHash<int, QByteArray> roleFile = files->roleNames();
+    QJsonArray fileArr;
+
+    for(int i = 0; i < fileRowCount; i++)
     {
+        QJsonObject objFile;
+        QModelIndex index = files->index(i, 0);
+        for(auto it = roleFile.constBegin(); it != roleFile.constEnd(); ++it)
+        {
+            int key = it.key();
+            QString name = QString::fromUtf8(it.value());
+            QVariant value = files->data(index, key);
+            objFile[name] = QJsonValue::fromVariant(value);
+        }
+        fileArr.append(objFile);
+    }
+
+
+    int ipRowCount = targetIps->rowCount();
+    QHash<int, QByteArray> role =  targetIps->roleNames();
+
+    for(int i= 0; i < ipRowCount; i++)
+    {
+        QJsonObject obj;
         QModelIndex index = targetIps->index(i, 0);
+        for(auto it = role.constBegin(); it != role.constEnd(); ++it)
+        {
+            int key = it.key();
+            QString name = QString::fromUtf8(it.value());
+            QVariant value = targetIps->data(index, key);
+            obj[name] = QJsonValue::fromVariant(value);
+        }
+
+        obj["files"] = fileArr;
+        obj["device_name"] = QSysInfo::machineHostName();
+        obj["type"] = "FILE_OFFER";
+        QJsonDocument doc(obj);
+        QByteArray byteData = doc.toJson(QJsonDocument::Compact);
+        QString ipstr = obj["ip"].toString();
+
+        if (ipstr.isEmpty()) {
+            qDebug() << "Dong" << i << "khong co truong 'ip' hop le!";
+            continue;
+        }
+
+        quint16 targetPort = 45454;
+        qint64 result = socket->writeDatagram(byteData, QHostAddress(ipstr), targetPort);
+
+        if(result == -1) {
+            qDebug() << "ko gửi được tới ip: " + ipstr;
+        } else {
+            qDebug() << "gửi thành công tới ip: " + ipstr;
+        }
 
 
     }
@@ -105,7 +162,6 @@ void NetworkManagerTest::processPendingDatagrams()
     {
         QByteArray datagram;
         datagram.resize(socket->pendingDatagramSize());
-        qDebug() << "size: " << socket->pendingDatagramSize();
 
         QHostAddress senderIp;
         quint16 senderPort;
@@ -114,8 +170,8 @@ void NetworkManagerTest::processPendingDatagrams()
 
         QJsonObject message = QJsonDocument::fromJson(datagram.data()).object();
         qDebug() << "Nhận được từ IP:" << senderIp.toString() << "Port:" << senderPort;
-        qDebug() << "Nội dung:" << message["type"].toString();
         QString type =  message["type"].toString();
+
         if(type == "DISCOVER_REQUEST")
         {
             // if(senderIp == myLocalIp) continue;
@@ -133,9 +189,19 @@ void NetworkManagerTest::processPendingDatagrams()
 
         } else if(type == "FILE_OFFER") {
             QString dName = message["device_name"].toString();
-            QString fName = message["file_name"].toString();
-            qint64 fSize = message["file_size"].toVariant().toLongLong();
-            emit fileOfferReceived(senderIp.toString(), dName, fName, fSize);
+            // QString fName = message["file_name"].toString();
+            // qint64 fSize = message["file_size"].toVariant().toLongLong();
+            QJsonArray filesArray = message["files"].toArray();
+            QVariantList variantFiles;
+            for (const QJsonValue &v : filesArray) {
+                if (v.isObject())
+                    variantFiles.append(v.toObject().toVariantMap());
+                else
+                    variantFiles.append(v.toVariant());
+            }
+
+
+            emit fileOfferReceived(senderIp.toString(), dName, variantFiles);
 
         } else if(type == "PORT_REPLY") {
             quint16 port = message["port"].toInt();

@@ -16,30 +16,34 @@ ApplicationWindow {
     NetworkManagerTest {
         id: networkManagerTest
         onPeerDiscovered: (name, ip) => {
-                              deviceModel.append({
-                                                     "name": name,
-                                                     "deviceType": "Phone",
-                                                     "ip": ip,
-                                                     "checked": false
-                                                 });
-                          }
-        onFileOfferReceived: (ip, dName, fName, fSize) => {
-                                 console.log  ("đã nhận duiwocjd file");
-                                 itemRequest.append({
-                                                        "nameDevice": dName,
-                                                        "typeDevice": "phone",
-                                                        "senderIp": ip,
-                                                        "files": [{
-                                                                "nameFile": fName,
-                                                                "sizeFile": fSize
-                                                            }]
-
-                                                    });
-                             }
+            deviceModel.append({
+                "name": name,
+                "deviceType": "Phone",
+                "ip": ip,
+                "checked": false
+            });
+        }
+        onFileOfferReceived: (ip, dName, files) => {
+            let fileList = [];
+            for (let i = 0; i < files.length; i++) {
+                fileList.push({
+                    "nameFile": files[i].fileName,
+                    "sizeFile": files[i].size,
+                    "byteFile": files[i].byte,
+                    "pathFile": files[i].path
+                });
+            }
+            itemRequest.append({
+                "nameDevice": dName,
+                "typeDevice": "phone",
+                "senderIp": ip,
+                "files": fileList
+            });
+        }
         onPortReceived: (ip, port) => {
-                            // tranferSenderTest.sendFile(ip, port, fileModel.get(0).path);
-                            tranferSenderTest.sendFiles(ip, port, fileModel);
-                        }
+            // tranferSenderTest.sendFile(ip, port, fileModel.get(0).path);
+            tranferSenderTest.sendFiles(ip, port, fileModel);
+        }
     }
 
     Component.onCompleted: {
@@ -68,18 +72,16 @@ ApplicationWindow {
 
                 if (result) {
                     fileModel.append({
-                                         "path": String(result.path),
-                                         "fileName": String(result.name),
-                                         "size": String(result.size),
-                                         "byte": String(result.byte)
-                                     });
+                        "path": String(result.path),
+                        "fileName": String(result.name),
+                        "size": String(result.size),
+                        "byte": String(result.byte)
+                    });
                 } else {
                     console.log("Không lấy được thông tin file:", fileUrl);
                 }
             }
         }
-
-
     }
 
     ListModel {
@@ -113,8 +115,9 @@ ApplicationWindow {
                 //     nameFile: "video-19-928162.mp4"
                 //     sizeFile: "122 MB"
                 // }
-            ]
 
+
+            ]
         }
         ListElement {
             nameDevice: "Samsung"
@@ -124,8 +127,8 @@ ApplicationWindow {
                 ListElement {
                     nameFile: "video.mp4"
                     sizeFile: "123 MB"
-                }]
-
+                }
+            ]
         }
     }
 
@@ -194,20 +197,20 @@ ApplicationWindow {
                                 if (newChecked) {
                                     var isExisted = false;
                                     for (var i = 0; i < deviceReceive.count; i++) {
-                                        if (deviceReceive.get(i).name === model.name) {
+                                        if (deviceReceive.get(i).ip === model.ip) {
                                             isExisted = true;
                                             break;
                                         }
                                     }
                                     if (!isExisted) {
                                         deviceReceive.append({
-                                                                 "name": model.name,
-                                                                 "ip" : model.ip
-                                                             });
+                                            "name": model.name,
+                                            "ip": model.ip
+                                        });
                                     }
                                 } else {
                                     for (var j = 0; j < deviceReceive.count; j++) {
-                                        if (deviceReceive.get(j).name === model.name) {
+                                        if (deviceReceive.get(j).ip === model.ip) {
                                             deviceReceive.remove(j, 1);
                                             break;
                                         }
@@ -388,26 +391,26 @@ ApplicationWindow {
                                 DropArea {
                                     anchors.fill: parent
                                     onDropped: drop => {
-                                                   if (drop.hasUrls) {
-                                                       for (var i = 0; i < drop.urls.length; i++) {
-                                                           var fileUrl = String(drop.urls[i]);
+                                        if (drop.hasUrls) {
+                                            for (var i = 0; i < drop.urls.length; i++) {
+                                                var fileUrl = String(drop.urls[i]);
 
-                                                           var result = fileHelper.getFileInfo(fileUrl);
+                                                var result = fileHelper.getFileInfo(fileUrl);
 
-                                                           if (result) {
-                                                               fileModel.append({
-                                                                                    "path": String(result.path),
-                                                                                    "fileName": String(result.name),
-                                                                                    "size": String(result.size),
-                                                                                    "byte": result.byte
-                                                                                });
-                                                           } else {
-                                                               console.log("Không lấy được thông tin file:", fileUrl);
-                                                           }
-                                                       }
-                                                       drop.acceptProposedAction();
-                                                   }
-                                               }
+                                                if (result) {
+                                                    fileModel.append({
+                                                        "path": String(result.path),
+                                                        "fileName": String(result.name),
+                                                        "size": String(result.size),
+                                                        "byte": result.byte
+                                                    });
+                                                } else {
+                                                    console.log("Không lấy được thông tin file:", fileUrl);
+                                                }
+                                            }
+                                            drop.acceptProposedAction();
+                                        }
+                                    }
                                 }
                             }
 
@@ -534,10 +537,10 @@ ApplicationWindow {
                                                         anchors.fill: parent
 
                                                         onClicked: {
-                                                            var deviceName = model.name;
+                                                            var deviceIp = model.ip;
 
                                                             for (var i = 0; i < deviceModel.count; i++) {
-                                                                if (deviceModel.get(i).name === deviceName) {
+                                                                if (deviceModel.get(i).ip === deviceIp) {
                                                                     deviceModel.setProperty(i, "checked", false);
                                                                     break;
                                                                 }
@@ -565,10 +568,15 @@ ApplicationWindow {
                                         console.log("Vui lòng chọn người nhận");
                                         return;
                                     }
-                                    console.log("gửi file nè");
-                                    var fileName = fileModel.get(0).fileName;
-                                    var fileSize = fileModel.get(0).byte;
-                                    networkManagerTest.announceFile(deviceReceive.get(0).ip, fileName, fileSize);
+
+                                    if (fileModel.count === 0) {
+                                        console.log("Vui lòng chọn file cần gửi");
+                                        return;
+                                    }
+
+                                    for (var i = 0; i < deviceReceive.count; i++) {
+                                        networkManagerTest.notifyRecipientsWithFiles(deviceReceive, fileModel);
+                                    }
                                 }
                             }
                         }
@@ -599,6 +607,7 @@ ApplicationWindow {
                                 color: "#919191"
                                 Layout.fillWidth: true
                                 text: "Không có yêu cầu"
+                                font.family: "Ubuntu Sans Mono"
                                 font.italic: true
                                 verticalAlignment: Text.AlignVCenter
                                 horizontalAlignment: Text.AlignHCenter
@@ -617,11 +626,11 @@ ApplicationWindow {
                                 clip: true
                                 Layout.preferredHeight: listRequest.contentHeight + 20
                                 interactive: false
-                                model:itemRequest
+                                model: itemRequest
 
                                 delegate: ItemDelegate {
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
+                                    // anchors.left: parent.left
+                                    // anchors.right: parent.right
                                     leftPadding: 8
                                     rightPadding: 8
 
@@ -653,11 +662,11 @@ ApplicationWindow {
                                                     color: "#f1f1f1"
                                                 }
 
-                                                Row {
+                                                Flow {
                                                     Layout.fillWidth: true
                                                     spacing: 6
                                                     Repeater {
-                                                        model:  itemRequest.get(index).files
+                                                        model: itemRequest.get(index).files
                                                         delegate: Rectangle {
                                                             width: contentRow.width + 16
                                                             height: 30
@@ -692,7 +701,6 @@ ApplicationWindow {
 
                                             RowLayout {
                                                 Layout.fillHeight: true
-
                                                 Button {
 
                                                     text: "accept"
@@ -703,7 +711,9 @@ ApplicationWindow {
                                                     font.weight: 600
                                                     onClicked: {
                                                         var port = TransferReceiverTest.startListening();
-                                                        networkManagerTest.sendPortReply(deviceReceive.get(0).ip, port);
+                                                        // Dùng đúng ip của REQUEST đang accept (model.ip),
+                                                        // không phải deviceReceive - hai model khác mục đích nhau
+                                                        networkManagerTest.sendPortReply(model.ip, port);
                                                     }
                                                 }
                                                 Button {
@@ -714,7 +724,6 @@ ApplicationWindow {
 
                                                     font.pixelSize: 14
                                                     font.weight: 600
-
                                                     onClicked: {
                                                         itemRequest.remove(index, 1);
                                                     }
@@ -724,7 +733,6 @@ ApplicationWindow {
                                     }
                                 }
                             }
-
                         }
                     }
 
