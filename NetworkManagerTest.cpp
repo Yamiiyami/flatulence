@@ -178,7 +178,7 @@ void NetworkManagerTest::processPendingDatagrams()
 
         if(type == "DISCOVER_REQUEST")
         {
-            // if(senderIp == myLocalIp) continue;
+            if(senderIp == myLocalIp) continue;
             QJsonObject replyObj;
             replyObj["type"] = "DISCOVER_RESPONSE";
             replyObj["device_name"] = QSysInfo::machineHostName();
