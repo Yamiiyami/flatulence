@@ -12,6 +12,9 @@ TransferReceiverTest::TransferReceiverTest(QObject *parent)
 
 quint16 TransferReceiverTest::startListening(quint16 port)
 {
+    if(server->isListening()) {
+        return server->serverPort();
+    }
     bool result = server->listen(QHostAddress::AnyIPv4, port);
     if(!result) {
         qDebug() << "mo port that bai";

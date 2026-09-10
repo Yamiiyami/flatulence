@@ -16,12 +16,26 @@ ApplicationWindow {
     NetworkManagerTest {
         id: networkManagerTest
         onPeerDiscovered: (name, ip) => {
-            deviceModel.append({
-                "name": name,
-                "deviceType": "Phone",
-                "ip": ip,
-                "checked": false
-            });
+            var isExistDevice = false;
+
+            for (var i = 0; i < deviceModel.count; i++) {
+                var currentDevice = deviceModel.get(i);
+                if (currentDevice) {
+                    console.log("Đang check IP của phần tử", i, ":", currentDevice.ip);
+                    if (currentDevice.ip === ip) {
+                        isExistDevice = true;
+                        break;
+                    }
+                }
+            }
+            if (!isExistDevice) {
+                deviceModel.append({
+                    "name": name,
+                    "deviceType": "Phone",
+                    "ip": ip,
+                    "checked": false
+                });
+            }
         }
         onFileOfferReceived: (ip, dName, files) => {
             let fileList = [];
@@ -41,7 +55,6 @@ ApplicationWindow {
             });
         }
         onPortReceived: (ip, port) => {
-            // tranferSenderTest.sendFile(ip, port, fileModel.get(0).path);
             console.log("[DEBUG] onPortReceived - ip:", ip, "port:", port);
             tranferSenderTest.sendFiles(ip, port, fileModel);
         }
@@ -66,10 +79,9 @@ ApplicationWindow {
         id: tranferSenderTest
 
         onStarted: (receiverIp, fileName, size) => {
-            console.log("[DEBUG] started:", receiverIp, fileName, size);
             var idx = -1;
             for (var i = 0; i < activeTransfers.count; i++) {
-                if (activeTransfers.get(i).ip === receiverIp) {
+                if (activeTransfers.get(i).ip === receiverIp && activeTransfers.get(i).fileName === fileName) {
                     idx = i;
                     break;
                 }
@@ -82,17 +94,14 @@ ApplicationWindow {
                     "status": "sending"
                 });
             } else {
-                activeTransfers.setProperty(idx, "fileName", fileName);
                 activeTransfers.setProperty(idx, "percent", 0);
             }
         }
 
         onProgressChanged: (receiverIp, fileName, sent, total) => {
-            console.log("[DEBUG] progress:", receiverIp, sent, "/", total);
             var percent = total > 0 ? Math.round((sent / total) * 100) : 0;
             for (var i = 0; i < activeTransfers.count; i++) {
-                if (activeTransfers.get(i).ip === receiverIp) {
-                    activeTransfers.setProperty(i, "fileName", fileName);
+                if (activeTransfers.get(i).ip === receiverIp && activeTransfers.get(i).fileName === fileName) {
                     activeTransfers.setProperty(i, "percent", percent);
                     break;
                 }
@@ -100,22 +109,20 @@ ApplicationWindow {
         }
 
         onFinished: receiverIp => {
-            for (var i = 0; i < activeTransfers.count; i++) {
+            // finished(ip) chỉ báo TẤT CẢ file cho ip này đã xong -> đánh dấu done cho mọi dòng có ip đó
+            for (var i = activeTransfers.count - 1; i >= 0; i--) {
                 if (activeTransfers.get(i).ip === receiverIp) {
                     activeTransfers.setProperty(i, "status", "done");
                     activeTransfers.setProperty(i, "percent", 100);
-                    break;
                 }
             }
 
-            // Xóa khỏi danh sách người nhận đã chọn
             for (var j = 0; j < deviceReceive.count; j++) {
                 if (deviceReceive.get(j).ip === receiverIp) {
                     deviceReceive.remove(j, 1);
                     break;
                 }
             }
-            // Bỏ tick trong deviceModel
             for (var k = 0; k < deviceModel.count; k++) {
                 if (deviceModel.get(k).ip === receiverIp) {
                     deviceModel.setProperty(k, "checked", false);
@@ -128,11 +135,9 @@ ApplicationWindow {
         }
 
         onErrorOccurred: (receiverIp, msg) => {
-            console.log("[DEBUG] finished:", receiverIp);
             for (var i = 0; i < activeTransfers.count; i++) {
                 if (activeTransfers.get(i).ip === receiverIp) {
                     activeTransfers.setProperty(i, "status", "failed");
-                    break;
                 }
             }
             console.log("Lỗi gửi tới", receiverIp, ":", msg);
@@ -361,6 +366,9 @@ ApplicationWindow {
                         color: checkDevice.pressed ? "#61ad5a" : checkDevice.hovered ? "#166534" : "#15803d"
                         radius: 12
                         border.color: "#1f1f1f"
+                    }
+                    onClicked: {
+                        networkManagerTest.discoverPeers();
                     }
                 }
             }
@@ -722,8 +730,9 @@ ApplicationWindow {
                                 model: itemRequest
 
                                 delegate: ItemDelegate {
-                                    // anchors.left: parent.left
-                                    // anchors.right: parent.right
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+
                                     leftPadding: 8
                                     rightPadding: 8
 
@@ -765,7 +774,7 @@ ApplicationWindow {
                                                             height: 30
                                                             color: "#15803d"
                                                             border.color: "#1f1f1f"
-                                                            radius: 16
+                                                            radius: 4
                                                             Row {
                                                                 id: contentRow
                                                                 spacing: 2
@@ -805,7 +814,7 @@ ApplicationWindow {
                                                     onClicked: {
                                                         var port = TransferReceiverTest.startListening();
                                                         networkManagerTest.sendPortReply(model.senderIp, port);
-                                                        // itemRequest.remove(index, 1); // xóa ngay sau khi accept
+                                                        itemRequest.remove(index, 1); // xóa ngay sau khi accept
                                                     }
                                                 }
                                                 Button {
